@@ -30,6 +30,7 @@ export const AppContainer = (props: AppProps & CustomAppProps) => {
     }
   }, [])
 
+  // TODO: add vault frame
   const pageFrames: { [href: string]: ReactNode } = {
     account: <AccountFrame user={serverProps.params['user']} />
   }
