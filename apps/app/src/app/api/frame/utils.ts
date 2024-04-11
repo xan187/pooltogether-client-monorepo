@@ -1,5 +1,12 @@
-import { FrameButton, SubgraphPrize, TokenWithAmount, VaultInfo } from '@shared/types'
-import { getTokenBalances, getUserSubgraphPrizes, getVaultId, NETWORK } from '@shared/utilities'
+import { FrameButton, SubgraphPrize, Token, TokenWithAmount, VaultInfo } from '@shared/types'
+import {
+  erc20ABI,
+  getTokenBalances,
+  getUserSubgraphPrizes,
+  getVaultId,
+  NETWORK,
+  vaultABI
+} from '@shared/utilities'
 import { ImageResponse } from 'next/og'
 import { NextResponse } from 'next/server'
 import { CSSProperties, ReactElement } from 'react'
@@ -81,14 +88,18 @@ export const errorResponse = (message: string, status?: number) => {
   return NextResponse.json({ message }, { status: status ?? 418 })
 }
 
+export const getPublicClient = (network: NETWORK): PublicClient => {
+  return createPublicClient({
+    chain: WAGMI_CHAINS[network as keyof typeof WAGMI_CHAINS],
+    transport: http(RPC_URLS[network as keyof typeof RPC_URLS])
+  }) as PublicClient
+}
+
 export const getUserAddress = async (user: string) => {
   if (isAddress(user)) return user
 
   if (user.endsWith('.eth')) {
-    const client = createPublicClient({
-      chain: WAGMI_CHAINS[NETWORK.mainnet],
-      transport: http(RPC_URLS[NETWORK.mainnet])
-    })
+    const client = getPublicClient(NETWORK.mainnet)
 
     const address = await getEnsAddress(client, { name: normalize(user) })
 
@@ -103,10 +114,7 @@ export const getUserVaultBalances = async (
 ) => {
   const userVaultBalances: { [tokenAddress: Address]: TokenWithAmount & VaultInfo } = {}
 
-  const client = createPublicClient({
-    chain: WAGMI_CHAINS[network as keyof typeof WAGMI_CHAINS],
-    transport: http(RPC_URLS[network as keyof typeof RPC_URLS])
-  }) as PublicClient
+  const client = getPublicClient(network)
 
   const validVaults = vaults.filter((v) => v.chainId === network)
   const vaultAddresses = validVaults.map((v) => v.address)
@@ -160,4 +168,71 @@ export const getAllUserLastPrizes = async (userAddress: Address) => {
   )
 
   return allUserLastPrizes.sort((a, b) => b.timestamp - a.timestamp)
+}
+
+export const getVaultData = async (
+  network: NETWORK,
+  vaultAddress: Address,
+  userAddress: Address
+) => {
+  const client = getPublicClient(network)
+
+  const shareInfo = await client.multicall({
+    contracts: [
+      { address: vaultAddress, abi: vaultABI, functionName: 'symbol' },
+      { address: vaultAddress, abi: vaultABI, functionName: 'name' },
+      { address: vaultAddress, abi: vaultABI, functionName: 'decimals' },
+      { address: vaultAddress, abi: vaultABI, functionName: 'asset' },
+      { address: vaultAddress, abi: vaultABI, functionName: 'balanceOf', args: [userAddress] }
+    ]
+  })
+
+  const share: Token & { amount: string } = {
+    chainId: network,
+    address: vaultAddress,
+    symbol: shareInfo[0].result as string,
+    name: shareInfo[1].result as string,
+    decimals: shareInfo[2].result as number,
+    amount: (shareInfo[4].result as bigint).toString()
+  }
+
+  const assetAddress = shareInfo[3].result as Address
+
+  const assetInfo = await client.multicall({
+    contracts: [
+      { address: assetAddress, abi: erc20ABI, functionName: 'symbol' },
+      { address: assetAddress, abi: erc20ABI, functionName: 'name' },
+      { address: assetAddress, abi: erc20ABI, functionName: 'decimals' },
+      { address: assetAddress, abi: erc20ABI, functionName: 'balanceOf', args: [userAddress] }
+    ]
+  })
+
+  const asset: Token & { amount: string } = {
+    chainId: network,
+    address: assetAddress,
+    symbol: assetInfo[0].result as string,
+    name: assetInfo[1].result as string,
+    decimals: assetInfo[2].result as number,
+    amount: (assetInfo[3].result as bigint).toString()
+  }
+
+  return { share, asset }
+}
+
+export const getAllowance = async (
+  network: NETWORK,
+  vaultAddress: Address,
+  userAddress: Address,
+  tokenAddress: Address
+) => {
+  const client = getPublicClient(network)
+
+  const allowance = await client.readContract({
+    address: tokenAddress,
+    abi: erc20ABI,
+    functionName: 'allowance',
+    args: [userAddress, vaultAddress]
+  })
+
+  return allowance
 }

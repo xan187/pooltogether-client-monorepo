@@ -37,7 +37,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   let user = prevState.user
 
-  if (prevState.view === 'welcome' && !prevState.user && !!userInput) {
+  if (!user && prevState.view === 'welcome' && !!userInput) {
     const userAddress = await getUserAddress(userInput)
 
     if (!!userAddress) {

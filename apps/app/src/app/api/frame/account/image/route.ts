@@ -11,10 +11,12 @@ export function GET(req: NextRequest) {
   const userName = searchParams.get('userName')
   const userAddress = searchParams.get('userAddress')
 
-  if (view === 'account' && !!userAddress && isAddress(userAddress)) {
-    return accountViewImg({ userName, userAddress })
-  } else if (view === 'wins' && !!userAddress && isAddress(userAddress)) {
-    return winsViewImg({ userName, userAddress })
+  if (!!userAddress && isAddress(userAddress)) {
+    if (view === 'account') {
+      return accountViewImg({ userName, userAddress })
+    } else if (view === 'wins') {
+      return winsViewImg({ userName, userAddress })
+    }
   }
 
   return errorResponse('Invalid Request', 400)
