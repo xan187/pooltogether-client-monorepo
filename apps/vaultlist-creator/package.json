@@ -15,7 +15,7 @@
     "axios": "^1.4.0",
     "classnames": "^2.3.2",
     "flowbite": "2.2.1",
-    "flowbite-react": "0.7.2",
+    "flowbite-react": "0.7.3",
     "framer-motion": "^10.12.16",
     "jotai": "^1.13.1",
     "lottie-react": "^2.4.0",
